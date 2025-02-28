@@ -14,9 +14,9 @@ number of files are present even if it is lower. E.g., input is 2 but only 1 fil
 
 Prediction Logic: You can write your own prediction algorithm (in such case pls provide the logic and rationale)
 or go by below for the sake of simplicity:
-• first predicted (n+1) data point is same as the 2nd highest value present in the 10 data points
-• n+2 data point has half the difference between n and n +1
-• n+3 data point has 1/4th the difference between n+1 and n+2
+first predicted (n+1) data point is same as the 2nd highest value present in the 10 data points
+n+2 data point has half the difference between n and n +1
+n+3 data point has 1/4th the difference between n+1 and n+2
 
 Output Format
 One .csv output file for each file processed. Each .csv file should have 3 columns on each row as shown below.
@@ -35,9 +35,17 @@ import os
 import itertools
 from collections import defaultdict
 import pandas as pd
+from random import randrange
+from datetime import datetime, timedelta
+
+from predictor import BasicPredictor
 
 APP_NAME = "Stock-Predictor"
-DATA_DIRECTORY = "data/"
+DATA_DIRECTORY_DEFAULT = "data/"
+INPUT_FILE_COUNT_DEFAULT = 2
+PREDICTION_DATA_POINTS = 10
+DATE_FORMAT = '%d-%m-%Y'
+TIMESTAMP = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +59,7 @@ def _validate_arguments(args):
     
     return (True, f"Arguments are valid: {args}") 
 
-def _read_csv_files_from_data(data_directory=DATA_DIRECTORY):
+def _read_csv_files_from_data(data_directory):
     return glob.iglob(f"{data_directory}**/*.csv", recursive=True)
         
 def _filter_csv_list(csv_list, data_directory, input_file_count):
@@ -68,6 +76,8 @@ def _filter_csv_list(csv_list, data_directory, input_file_count):
             continue
         
         exchange, csv_filename = path_parts 
+        if "Prediction_" in csv_filename:
+            continue
         _exchange_stock_dict[exchange].append(_csv)
     
     for _exchange, _csv_list in _exchange_stock_dict.items():
@@ -78,6 +88,75 @@ def _filter_csv_list(csv_list, data_directory, input_file_count):
 
     return new_csv_list
 
+# Requirement 1
+def extract_stock_data_subset(stock_data_df):
+    stock_data_size = len(stock_data_df)
+
+    random_df_position = randrange(0, stock_data_size - PREDICTION_DATA_POINTS)
+    stock_data_subset = stock_data_df.iloc[
+        random_df_position:random_df_position + PREDICTION_DATA_POINTS
+    ].copy()
+    stock_data_subset.reset_index(drop=True, inplace=True)
+    
+    return stock_data_subset
+
+# Requirement 2
+def prepare_prediction_df(stock_data_subset, prediction):
+    prediction_length = len(prediction)
+
+    last_timestamp = stock_data_subset['Timestamp'].iloc[-1]
+    last_timestamp_dt = datetime.strptime(last_timestamp, DATE_FORMAT)
+    new_timestamps = []
+    new_tickers = []
+    for i in range(prediction_length):
+        next_timestamp = last_timestamp_dt + timedelta(days=i+1)
+        new_timestamps.append(next_timestamp.strftime(DATE_FORMAT))
+        new_tickers.append(stock_data_subset['Ticker'].iloc[0])
+
+    prediction_df = pd.DataFrame({
+        "Ticker": new_tickers,
+        "Timestamp": new_timestamps,
+        "Value": prediction
+    },  index=None)
+    
+    final_result_df = pd.concat(
+        [stock_data_subset, prediction_df], 
+        axis=0
+    )
+
+    return final_result_df
+
+def generate_basic_prediction(csv_path, stock_data_df):
+    stock_data_subset = extract_stock_data_subset(stock_data_df)
+
+    basic_predictor = BasicPredictor(
+        input_data_df=stock_data_subset["Value"]
+    )
+    prediction = basic_predictor.predict()
+
+    result_df = prepare_prediction_df(stock_data_subset, prediction)
+    bp_csv_path = csv_path.replace(
+        '.csv',
+        f'_BasicPrediction_{TIMESTAMP}.csv'
+    )
+    result_df.to_csv(bp_csv_path, index=False)
+
+def generate_numpy_prediction(csv_path, stock_data_df):
+    stock_data_subset = extract_stock_data_subset(stock_data_df)
+
+    numpy_predictor = NumPyPredictor(
+        x=stock_data_subset["Timestamp"],
+        y=stock_data_subset["Value"],
+        degree=1
+    )
+    prediction = numpy_predictor.predict()
+
+    result_df = prepare_prediction_df(stock_data_subset, prediction)
+    bp_csv_path = csv_path.replace(
+        '.csv',
+        f'_NumPyPrediction_{TIMESTAMP}.csv'
+    )
+    result_df.to_csv(bp_csv_path, index=False)
 
 # Application entry point
 def app():
@@ -96,17 +175,15 @@ def app():
     )
 
     parser.add_argument(
-        '--input_file_count', type=int, default=2,
+        '--input_file_count', type=int, 
+        default=INPUT_FILE_COUNT_DEFAULT, const=INPUT_FILE_COUNT_DEFAULT, nargs='?',
         help='Number of files to read [1-2]'
     )
     parser.add_argument(
-        '--data_directory_path', type=str, default=DATA_DIRECTORY,
+        '--data_directory_path', type=str, 
+        default=DATA_DIRECTORY_DEFAULT, const=DATA_DIRECTORY_DEFAULT, nargs='?',
         help='Path of data directory, containing CSV files'
     )
-
-    # # Switch
-    # parser.add_argument('--switch', action='store_true',
-    #                     help='A boolean switch')
 
     args = parser.parse_args()
     (valid, message) = _validate_arguments(args)
@@ -116,23 +193,40 @@ def app():
     else:
         logger.debug(message)
 
-    csv_list = _read_csv_files_from_data()
+    data_directory_path = args.data_directory_path
+    input_file_count = args.input_file_count
+
+    csv_list = _read_csv_files_from_data(
+        data_directory=data_directory_path
+    )
     csv_list = _filter_csv_list(
         csv_list=csv_list,
-        data_directory=args.data_directory_path ,
-        input_file_count=args.input_file_count
+        data_directory=data_directory_path ,
+        input_file_count=input_file_count
     )
 
-    if new_csv_list:
+    if csv_list:
         logger.info(f"Valid CSV files found")
     
     for _csv in csv_list:
         logger.info(f"Running prediction for {_csv}...")
-        stock_data_df = pd.read_csv(_csv)
-
+        stock_data_df = pd.read_csv(
+            _csv, 
+            header=None, names=["Ticker", "Timestamp", "Value"]
+        )
+        stock_data_df['Timestamp'] = pd.to_datetime(
+            stock_data_df['Timestamp'],
+            format=DATE_FORMAT
+        ).dt.strftime(DATE_FORMAT)
+    
+        stock_data_size = len(stock_data_df)
+        if stock_data_size < PREDICTION_DATA_POINTS:
+            logger.error("CSV File doesn't have enough data points")
+    
+        generate_basic_prediction(_csv, stock_data_df)
+        # generate_numpy_prediction(_csv, stock_data_df)
         
-
-        predictor = BasicPredictor()
+        
 
 if __name__ == "__main__":
     app()
