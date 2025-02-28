@@ -35,18 +35,18 @@ class BasicPredictor(Predictor):
         # return output_df
         return n
  
-class NumPyPredictor(Predictor):
-    def __init__(self, x, y, degree=1):
-        self.x = x
-        self.y = y
-        self.degree = degree
+# class NumPyPredictor(Predictor):
+#     def __init__(self, x, y, degree=1):
+#         self.x = x
+#         self.y = y
+#         self.degree = degree
 
-    def predict(self):
-        coefficients = np.polyfit(
-            self.x, self.y, self.degree
-        )
+#     def predict(self):
+#         coefficients = np.polyfit(
+#             self.x, self.y, self.degree
+#         )
         
-        p = np.poly1d(coefficients)
+#         p = np.poly1d(coefficients)
 
-        plt.plot(x, p(x))
-        return n
+#         plt.plot(x, p(x))
+#         return n

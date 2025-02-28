@@ -141,22 +141,22 @@ def generate_basic_prediction(csv_path, stock_data_df):
     )
     result_df.to_csv(bp_csv_path, index=False)
 
-def generate_numpy_prediction(csv_path, stock_data_df):
-    stock_data_subset = extract_stock_data_subset(stock_data_df)
+# def generate_numpy_prediction(csv_path, stock_data_df):
+#     stock_data_subset = extract_stock_data_subset(stock_data_df)
 
-    numpy_predictor = NumPyPredictor(
-        x=stock_data_subset["Timestamp"],
-        y=stock_data_subset["Value"],
-        degree=1
-    )
-    prediction = numpy_predictor.predict()
+#     numpy_predictor = NumPyPredictor(
+#         x=stock_data_subset["Timestamp"],
+#         y=stock_data_subset["Value"],
+#         degree=1
+#     )
+#     prediction = numpy_predictor.predict()
 
-    result_df = prepare_prediction_df(stock_data_subset, prediction)
-    bp_csv_path = csv_path.replace(
-        '.csv',
-        f'_NumPyPrediction_{TIMESTAMP}.csv'
-    )
-    result_df.to_csv(bp_csv_path, index=False)
+#     result_df = prepare_prediction_df(stock_data_subset, prediction)
+#     bp_csv_path = csv_path.replace(
+#         '.csv',
+#         f'_NumPyPrediction_{TIMESTAMP}.csv'
+#     )
+#     result_df.to_csv(bp_csv_path, index=False)
 
 # Application entry point
 def app():
@@ -224,7 +224,6 @@ def app():
             logger.error("CSV File doesn't have enough data points")
     
         generate_basic_prediction(_csv, stock_data_df)
-        # generate_numpy_prediction(_csv, stock_data_df)
         
         
 
