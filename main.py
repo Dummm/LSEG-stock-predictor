@@ -225,7 +225,6 @@ def app():
     
         generate_basic_prediction(_csv, stock_data_df)
         
-        
 
 if __name__ == "__main__":
     app()
